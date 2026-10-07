@@ -1,7 +1,7 @@
 {
   "name": "suppression-census",
   "version": "0.1.0",
-  "description": "Counts every way a repo can tell a check to look away, and fails when the count rises. The ratchet that guards the other ratchets.",
+  "description": "Fail CI when your codebase gains a new eslint-disable, @ts-ignore, skipped test, or lint rule switched off.",
   "license": "MIT",
   "repository": {
     "type": "git",
