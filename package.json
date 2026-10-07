@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "description": "Counts every way a repo can tell a check to look away, and fails when the count rises. The ratchet that guards the other ratchets.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zz-plant/suppression-census.git"
+  },
+  "homepage": "https://github.com/zz-plant/suppression-census#readme",
+  "bugs": "https://github.com/zz-plant/suppression-census/issues",
   "author": "Kanav Jain",
   "type": "module",
   "main": "./dist/index.js",
