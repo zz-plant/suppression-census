@@ -52,10 +52,10 @@ A rule that is off at the top level only so that an `overrides` block can turn i
 
 ## Install
 
+Not yet published to npm. Install it from GitHub; npm builds it on install:
+
 ```bash
-npm install --save-dev suppression-census
-# or
-bun add --dev suppression-census
+npm install --save-dev github:zz-plant/suppression-census
 ```
 
 Requires Node.js 20 or later, or Bun 1.1 or later.
