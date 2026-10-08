@@ -52,17 +52,6 @@ A rule that is off at the top level only so that an `overrides` block can turn i
 
 ## Install
 
-> [!NOTE]
-> This package is not on npm yet. Until the first release, install it from GitHub with npm, which builds it during install:
->
-> ```bash
-> npm install --save-dev github:zz-plant/suppression-census
-> ```
->
-> Bun skips build steps for packages installed from GitHub, so the command-line tool won't be available that way. Use npm for now.
-
-After the first release:
-
 ```bash
 npm install --save-dev suppression-census
 # or

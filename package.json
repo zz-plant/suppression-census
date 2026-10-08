@@ -55,6 +55,6 @@
     "typescript": "^5.9.2"
   },
   "bin": {
-    "suppression-census": "./dist/cli.js"
+    "suppression-census": "dist/cli.js"
   }
 }
