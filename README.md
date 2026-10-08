@@ -131,7 +131,8 @@ All settings live in `suppression-census.json` at the repository root. The file 
 | Field | Required | Default | Meaning |
 | --- | --- | --- | --- |
 | `baseline` | Yes | | The highest allowed count per category, using the keys from [What it counts](#what-it-counts). Only the keys you list are checked. |
-| `minimumTestFiles` | No | No minimum | The fewest test files allowed. A test file is any file ending in `.test` or `.spec` plus a JavaScript or TypeScript extension. |
+| `minimumTestFiles` | No | No minimum | The fewest test files allowed. By default a test file is any file ending in `.test` or `.spec` plus a JavaScript or TypeScript extension. |
+| `testFilePattern` | No | `\\.(?:test\|spec)\\.[cm]?[jt]sx?$` | A regular expression that decides which scanned files count toward `minimumTestFiles`. |
 | `roots` | No | The whole repository | Folders to scan, relative to the repository root. A folder that doesn't exist is skipped. |
 | `lintConfig` | No | No rule audit | Path to a JSON lint config with `rules` and `overrides`. This covers `.oxlintrc.json` and the older `.eslintrc.json` format. |
 | `exclude` | No | `[]` | Individual files to skip, as paths from the repository root. |
@@ -139,6 +140,29 @@ All settings live in `suppression-census.json` at the repository root. The file 
 | `ignoredDirectories` | No | `node_modules`, `dist`, `build`, `coverage`, `.git`, `.next`, and a few more | Folder names to skip wherever they appear. |
 
 Use `exclude` for a file that contains these patterns as plain text, such as a test of your own lint tooling. Otherwise every pattern in it would be counted.
+
+### A TypeScript or JavaScript config
+
+The config can also be an export of a `.ts`, `.mts`, `.js`, or `.mjs` module. This helps when the folder lists are shared with other tooling, or when you want comments next to each number:
+
+```ts
+// scripts/census.config.ts
+import type { CensusConfig } from "suppression-census";
+
+export const suppressionCensus: CensusConfig = {
+  roots: ["src", "test"],
+  lintConfig: ".oxlintrc.json",
+  baseline: { lintSuppressions: 3, typeSuppressions: 1, skippedTests: 0 },
+  minimumTestFiles: 40,
+  testFilePattern: /\.test\.tsx?$/,
+};
+```
+
+```bash
+suppression-census --config scripts/census.config.ts --export suppressionCensus
+```
+
+Without `--export`, the module's default export is used. A `.ts` config needs Bun, or Node.js 22.18 or later.
 
 ### Changing the baseline
 
@@ -149,7 +173,8 @@ Lowering a number is the expected way the baseline changes. Raising one is a pol
 ```text
 suppression-census [options]
 
-  --config <path>   Config file to read. Default: suppression-census.json
+  --config <path>   Config file to read: JSON, or a .ts/.js module. Default: suppression-census.json
+  --export <name>   Which export of a module config to read. Default: default
   --root <path>     Repository root to scan. Default: the current directory
   --init            Print a config with today's counts as the baseline, then exit
   --json            Print every count and every matching line as JSON, without pass or fail

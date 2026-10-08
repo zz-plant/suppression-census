@@ -56,6 +56,28 @@ describe("cli", () => {
     assert.match(stderr, /src\/b\.ts:1/);
   });
 
+  it("reads a named export of a TypeScript config module", () => {
+    writeFileSync(
+      join(root, "census.config.ts"),
+      [
+        'const shared: string[] = ["node_modules"];',
+        "export const census = {",
+        '  roots: ["src"],',
+        "  ignoredDirectories: shared,",
+        "  baseline: { typeSuppressions: 2 },",
+        "  testFilePattern: /\\.test\\.ts$/,",
+        "};",
+      ].join("\n"),
+    );
+    const check = run("--config", "census.config.ts", "--export", "census");
+    assert.equal(check.code, 0, check.stderr);
+    assert.match(check.stdout, /within baseline/);
+
+    const missing = run("--config", "census.config.ts");
+    assert.notEqual(missing.code, 0);
+    assert.match(missing.stderr, /no export named "default"/);
+  });
+
   it("--json emits the census without a verdict", () => {
     const { code, stdout } = run("--json");
     assert.equal(code, 0);

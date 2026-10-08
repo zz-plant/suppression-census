@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, it } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -66,6 +66,18 @@ describe("walkFiles", () => {
   it("skips ignored directories, declaration files, non-code, and excluded paths", () => {
     const files = walkFiles({ root, exclude: ["tests/meter.test.ts"] });
     assert.deepEqual(files, ["src/a.ts", "src/b.tsx", "tests/a.test.ts", "tests/b.spec.ts"]);
+  });
+
+  it("skips an entry it cannot stat instead of crashing the gate", () => {
+    const linked = mkdtempSync(join(tmpdir(), "suppression-census-link-"));
+    try {
+      mkdirSync(join(linked, "src"));
+      writeFileSync(join(linked, "src", "a.ts"), "export const a = 1;\n");
+      symlinkSync(join(linked, "gone.ts"), join(linked, "src", "dangling.ts"));
+      assert.deepEqual(walkFiles({ root: linked }), ["src/a.ts"]);
+    } finally {
+      rmSync(linked, { recursive: true, force: true });
+    }
   });
 
   it("scans only the roots it was given, and tolerates a missing one", () => {
@@ -164,6 +176,13 @@ describe("config", () => {
     const census = censusFromConfig(root, config);
     assert.equal(census.filesScanned, 2);
     assert.equal(compareToBaseline(census, config.baseline, config.minimumTestFiles).ok, true);
+  });
+
+  it("counts test files by a configured pattern, given as a string or a RegExp", () => {
+    const fromString = censusFromConfig(root, parseConfig({ roots: ["tests"], baseline: { skippedTests: 2 }, testFilePattern: "\\.spec\\.ts$" }));
+    assert.equal(fromString.testFiles, 1);
+    const fromRegExp = censusFromConfig(root, parseConfig({ roots: ["tests"], baseline: { skippedTests: 2 }, testFilePattern: /\.test\.ts$/ }));
+    assert.equal(fromRegExp.testFiles, 2);
   });
 
   it("rejects an empty or malformed baseline", () => {

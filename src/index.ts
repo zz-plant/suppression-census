@@ -12,7 +12,7 @@
  * may not rise. A burn-down that trades a lint finding for a disable comment
  * moves one number down and this one up, and the gate rejects it.
  */
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 export type Category = {
@@ -28,8 +28,8 @@ export const DEFAULT_CATEGORIES: readonly Category[] = [
     key: "lintSuppressions",
     label: "inline lint suppressions",
     remedy: "fix the finding, or narrow the disable to one line with a `--` reason",
-    // oxlint and biome honour eslint-disable comments, so every spelling suppresses.
-    pattern: /\b(?:es|ox|biome-ignore )?lint-disable(?:-next-line|-line)?\b|\bbiome-ignore\b/g,
+    // oxlint honours eslint-disable comments, so both spellings suppress; biome has its own.
+    pattern: /\b(?:es|ox)lint-disable(?:-next-line|-line)?\b|\bbiome-ignore\b/g,
   },
   {
     key: "typeSuppressions",
@@ -75,7 +75,24 @@ export interface WalkOptions {
 
 const toPosix = (value: string) => value.split(sep).join("/");
 
-/** Every scannable file under the roots, as sorted root-relative POSIX paths. */
+/** "directory", "file", "other" (socket, FIFO, device), or null when it cannot be stat'ed. */
+const statKind = (path: string): "directory" | "file" | "other" | null => {
+  try {
+    const stats = statSync(path);
+    return stats.isDirectory() ? "directory" : stats.isFile() ? "file" : "other";
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Every scannable file under the roots, as sorted root-relative POSIX paths.
+ *
+ * The walk never throws for the tree's sake. A root that does not exist, a directory
+ * that cannot be read, and an entry that cannot be stat'ed (a dangling symlink, a file
+ * deleted mid-walk) each contribute nothing, so one bad entry cannot crash the gate.
+ * Symlinks are followed.
+ */
 export function walkFiles(options: WalkOptions): string[] {
   const root = resolve(options.root);
   const roots = options.roots ?? ["."];
@@ -85,13 +102,22 @@ export function walkFiles(options: WalkOptions): string[] {
   const files: string[] = [];
 
   const walk = (absolute: string) => {
-    for (const entry of readdirSync(absolute)) {
+    let entries: string[];
+    try {
+      entries = readdirSync(absolute);
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
       if (ignored.has(entry)) continue;
       const child = join(absolute, entry);
-      if (statSync(child).isDirectory()) {
+      const kind = statKind(child);
+      if (kind === "directory") {
         walk(child);
         continue;
       }
+      if (kind !== "file") continue;
       if (!extensions.some((extension) => entry.endsWith(extension))) continue;
       if (/\.d\.[cm]?ts$/.test(entry)) continue;
       const relativePath = toPosix(relative(root, child));
@@ -102,8 +128,7 @@ export function walkFiles(options: WalkOptions): string[] {
 
   for (const scanRoot of roots) {
     const absolute = resolve(root, scanRoot);
-    if (existsSync(absolute) && statSync(absolute).isDirectory()) walk(absolute);
-    // A root that does not exist is not a failure; the repo layout may change.
+    if (statKind(absolute) === "directory") walk(absolute);
   }
 
   return files.sort();
@@ -318,7 +343,10 @@ export function compareToBaseline(
   return { errors, improvements, ok: errors.length === 0 };
 }
 
-/** The on-disk config shape, usually `suppression-census.json` at the repo root. */
+/**
+ * The config shape: `suppression-census.json` at the repo root, or an export of a
+ * `.ts`/`.js` module the CLI is pointed at with `--config` and `--export`.
+ */
 export interface CensusConfig {
   roots?: string[];
   extensions?: string[];
@@ -327,6 +355,8 @@ export interface CensusConfig {
   lintConfig?: string;
   baseline: Record<string, number>;
   minimumTestFiles?: number;
+  /** What makes a scanned file a test file, for the floor. A string is compiled as a RegExp. */
+  testFilePattern?: string | RegExp;
 }
 
 const isStringArray = (value: unknown): value is string[] =>
@@ -353,6 +383,9 @@ export function parseConfig(parsed: unknown, source = "config"): CensusConfig {
   if (isStringArray(record.exclude)) config.exclude = record.exclude;
   if (typeof record.lintConfig === "string") config.lintConfig = record.lintConfig;
   if (typeof record.minimumTestFiles === "number") config.minimumTestFiles = record.minimumTestFiles;
+  if (typeof record.testFilePattern === "string" || record.testFilePattern instanceof RegExp) {
+    config.testFilePattern = record.testFilePattern;
+  }
   return config;
 }
 
@@ -369,5 +402,7 @@ export function censusFromConfig(root: string, config: CensusConfig): Census {
     ignoredDirectories: config.ignoredDirectories,
     exclude: config.exclude,
     lintConfig: config.lintConfig,
+    testFilePattern:
+      typeof config.testFilePattern === "string" ? new RegExp(config.testFilePattern) : config.testFilePattern,
   });
 }
