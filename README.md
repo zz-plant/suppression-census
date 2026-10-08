@@ -238,6 +238,8 @@ bun run check   # type check and tests
 bun run build   # compile to dist/
 ```
 
+To release, bump `version` in `package.json`, merge, and push a matching tag (`git tag v0.1.1 && git push origin v0.1.1`). The release workflow checks that the tag and version agree, runs the checks, and publishes to npm with provenance.
+
 ## License
 
 [MIT](LICENSE)

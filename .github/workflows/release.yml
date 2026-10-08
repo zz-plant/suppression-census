@@ -1,0 +1,64 @@
+name: Release
+
+# Pushing a v* tag publishes that version to npm. The tag and package.json
+# have to agree, and the checks have to pass, or nothing is published.
+#
+# Needs an NPM_TOKEN repository secret (an npm automation or granular token
+# with publish rights). Once the package exists on npm, trusted publishing
+# can replace the token: add this workflow as a trusted publisher on
+# npmjs.com and delete the secret; --provenance keeps working either way.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish, e.g. v0.1.0'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    if: ${{ github.repository_owner == 'zz-plant' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # --provenance signs the package with the workflow's identity.
+      id-token: write
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - run: bun install --frozen-lockfile
+
+      - name: Check the version matches the tag
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "package.json is $PKG but the tag is $TAG. Bump one of them."
+            exit 1
+          fi
+
+      # prepublishOnly runs the typecheck, tests and build before packing.
+      - name: Publish suppression-census
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN is not set, so there is nothing to publish with. Add it under Settings > Secrets and variables > Actions, then re-run."
+            exit 1
+          fi
+          npm publish --provenance --access public
