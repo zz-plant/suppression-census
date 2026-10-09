@@ -3,10 +3,11 @@ name: Release
 # Pushing a v* tag publishes that version to npm. The tag and package.json
 # have to agree, and the checks have to pass, or nothing is published.
 #
-# Needs an NPM_TOKEN repository secret (an npm automation or granular token
-# with publish rights). Once the package exists on npm, trusted publishing
-# can replace the token: add this workflow as a trusted publisher on
-# npmjs.com and delete the secret; --provenance keeps working either way.
+# Publishes with npm trusted publishing: npm checks this workflow's identity,
+# so no token is stored. One-time setup, after the first publish by hand: on
+# npmjs.com open the package's Settings > Trusted publisher, choose GitHub
+# Actions, and enter zz-plant / suppression-census / release.yml. An NPM_TOKEN
+# secret, if one is set, still works as a fallback.
 
 on:
   push:
@@ -57,8 +58,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN is not set, so there is nothing to publish with. Add it under Settings > Secrets and variables > Actions, then re-run."
-            exit 1
+          # Node's npm, not the bun-backed npm that setup-bun puts first in
+          # PATH: bun's cannot do the OIDC exchange trusted publishing needs.
+          NPM="$(dirname "$(which node)")/npm"
+          # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+          "$NPM" install -g npm@^11.5.1
+          VERSION="$(node -p "require('./package.json').version")"
+          if "$NPM" view "suppression-census@$VERSION" version >/dev/null 2>&1; then
+            echo "suppression-census@$VERSION is already on npm; nothing to publish."
+            exit 0
           fi
-          npm publish --provenance --access public
+          "$NPM" publish --provenance --access public
