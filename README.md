@@ -14,20 +14,6 @@ $ suppression-census
   ❌     test/b.test.ts:2  it.skip("flaky", () => {});
 ```
 
-## Contents
-
-- [Why](#why)
-- [What it counts](#what-it-counts)
-- [Install](#install)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
-- [CLI reference](#cli-reference)
-- [Using it as a library](#using-it-as-a-library)
-- [How it compares](#how-it-compares)
-- [Limitations](#limitations)
-- [Development](#development)
-- [License](#license)
-
 ## Why
 
 Linters, type checkers, and test suites all have an escape hatch. You can add a comment that tells the tool to look away, and the check goes green while the problem stays in the code. That is usually the fastest way to make a red build pass. It is also the path an AI coding agent tends to find first when it is asked to "make CI green".
